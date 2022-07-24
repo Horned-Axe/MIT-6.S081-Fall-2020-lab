@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    int no,time,res;
+    int no,time=0,res;
 
     if(argc<=1){
         //错误提示参考Ubuntu系统sleep错误提示，并加上Usage
