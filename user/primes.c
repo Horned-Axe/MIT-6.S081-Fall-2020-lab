@@ -1,6 +1,8 @@
 #include "../kernel/types.h"
 #include "../user/user.h"
 
+int create_griddle(int fd[],int level);
+
 int main()
 {
     int fd[2],retpid;
@@ -42,7 +44,7 @@ int create_griddle(int fd[],int level)
     if(read(fd[0],&base,sizeof(base))==0){
         return 0;//这个应当不会空，因为在有需要时才创建//但还是判断一下吧(   //“心于何处”...
     }
-    fprintf(2,"prime %d",&base);
+    fprintf(2,"prime %d\n",base);//!!!fprintf(2,"prime %d\n",&base)是错的!!!不是地址!!!???
 
     //读到第一个滤过筛网的数，就跳出循环并创建下一层滤网；否则返回
     while(1){
@@ -70,8 +72,10 @@ int create_griddle(int fd[],int level)
         close(next_fd[0]);//关闭管道读端
         do{
             //进行筛选
-            if(num%base!=0)
+            if(num%base!=0){
                 write(next_fd[1],&num,sizeof(num));
+            }
+                
         }while(read(fd[0],&num,sizeof(num))!=0);
         close(next_fd[1]);
         return retpid;
