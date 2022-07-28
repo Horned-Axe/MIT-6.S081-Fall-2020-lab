@@ -7,8 +7,6 @@ void find(char*path,char*name);
 
 int main(int argc, char *argv[])
 {
-    int i;
-
     if(argc < 2){
         fprintf(2,"find: Parameters are not enough\n");
         exit(1);
@@ -26,7 +24,7 @@ int main(int argc, char *argv[])
 //得到无前置路径的白名()
 char* fmtname(char *path)
 {
-    static char buf[DIRSIZ+1];
+    //static char buf[DIRSIZ+1];
     char *p;
 
     // Find first character after last slash.
@@ -35,11 +33,13 @@ char* fmtname(char *path)
     p++;
 
     // Return blank-padded name.
-    if(strlen(p) >= DIRSIZ)
-        return p;
+    //if(strlen(p) >= DIRSIZ)
+    return p;
+    /*//这里大抵是填充空字符串的   先不用了
     memmove(buf, p, strlen(p));
     memset(buf+strlen(p), ' ', DIRSIZ-strlen(p));
     return buf;
+    */
 }
 
 void find(char*path,char*name)
@@ -64,7 +64,8 @@ void find(char*path,char*name)
     switch(st.type){
         case T_FILE: //如果是文件，则进行比较
             if(strcmp(fmtname(path),name)==0)
-                printf("%s",path);
+                printf("%s\n",path);
+            break;
 
         case T_DIR: //如果是目录，则进入进行查找
             if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){
@@ -75,15 +76,19 @@ void find(char*path,char*name)
             p = buf+strlen(buf);
             *p++ = '/';
             while(read(fd, &de, sizeof(de)) == sizeof(de)){
-            if(de.inum == 0)
-                continue;
-            memmove(p, de.name, DIRSIZ);
-            p[DIRSIZ] = 0;
-            if(stat(buf, &st) < 0){
-                printf("find: cannot stat %s\n", buf);
-                continue;
-            }
-            find(buf,name);
+                if(de.inum == 0)
+                    continue;
+                memmove(p, de.name, DIRSIZ);
+                p[DIRSIZ] = 0;
+
+                char *lastname=fmtname(buf);
+                if((strcmp(lastname,".")!=0)&&(strcmp(lastname,"..")!=0)){//de.name和fmtname(buf)...
+                    if(stat(buf, &st) < 0){
+                        printf("find: cannot stat %s\n", buf);
+                        continue;
+                    }                
+                    find(buf,name);
+                }                
             }
             break;
     }
