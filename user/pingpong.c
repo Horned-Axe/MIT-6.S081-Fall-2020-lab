@@ -20,7 +20,7 @@ int main()
         close(child_fd[0]);
 
         read(father_fd[0],buffer,sizeof(buffer));
-        fprintf(2,"%d:received %s\n",pid_t,buffer);
+        fprintf(2,"%d: received %s\n",pid_t,buffer);
 
         char *words="pong";
         write(child_fd[1],words,strlen(words)+1);
@@ -37,7 +37,8 @@ int main()
         write(father_fd[1], words, strlen(words) + 1); 
 
         read(child_fd[0],buffer,sizeof(buffer)); 
-        fprintf(2,"%d:received %s\n",pid_t,buffer);
+        fprintf(2,"%d: received %s\n",pid_t,buffer);
+        wait(0);
         exit(0);
     }
     else{
