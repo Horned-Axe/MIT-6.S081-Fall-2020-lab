@@ -105,6 +105,7 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -129,13 +130,14 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,//编号SYS_trace与sys_trace()进行关联，在syscall()中能够调用
+[SYS_sysinfo] sys_sysinfo,//about sysinfo
 };
 
 //包含了syscall的编号与对应的名字，方便输出
 const char *syscall_name[]={
 "", "fork", "exit", "wait", "pipe", "read", "kill", "exec", "fstat", "chdir", "dup",
 "getpid", "sbrk", "sleep", "uptime",  "open", "write", "mknod", "unlink", "link", "mkdir",
-"close", "trace"
+"close", "trace","sysinfo"
 };
 
 void
