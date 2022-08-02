@@ -95,3 +95,15 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void)
+{
+  int mask;
+
+  if(argint(0,&mask)<0)//从a0中得到参数
+    return -1;
+  
+  myproc()->mask=mask;//把得到的输入掩码赋予当前进程
+  return 0;  
+}
