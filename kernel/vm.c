@@ -15,12 +15,51 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+void kvm_map_pagetable(pagetable_t pgtbl) {
+  // 将各种内核需要的 direct mapping 添加到页表 pgtbl 中。
+  
+  // uart registers
+  kvmmap(pgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+  // virtio mmio disk interface
+  kvmmap(pgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+  // CLINT
+  kvmmap(pgtbl, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+
+  // PLIC
+  kvmmap(pgtbl, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+  // map kernel text executable and read-only.
+  kvmmap(pgtbl, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+
+  // map kernel data and the physical RAM we'll make use of.
+  kvmmap(pgtbl, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  kvmmap(pgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+}
+
+pagetable_t
+kvminit_newpgtbl()
+{
+  pagetable_t pgtbl = (pagetable_t) kalloc();
+  memset(pgtbl, 0, PGSIZE);
+
+  kvm_map_pagetable(pgtbl);
+
+  return pgtbl;
+}
+
 /*
  * create a direct-map page table for the kernel.
  */
 void
 kvminit()
 {
+  kernel_pagetable = kvminit_newpgtbl(); // 仍然需要有全局的内核页表，用于内核 boot 过程，以及无进程在运行时使用。
+/*
   kernel_pagetable = (pagetable_t) kalloc();
   memset(kernel_pagetable, 0, PGSIZE);
 
@@ -45,6 +84,7 @@ kvminit()
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
   kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+*/
 }
 
 // Switch h/w page table register to the kernel's page table,
@@ -114,10 +154,17 @@ walkaddr(pagetable_t pagetable, uint64 va)
 // add a mapping to the kernel page table.
 // only used when booting.
 // does not flush TLB or enable paging.
-void
+/*void
 kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 {
   if(mappages(kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+}*/
+
+void
+kvmmap(pagetable_t pgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
+{
+  if(mappages(pgtbl, va, sz, pa, perm) != 0)
     panic("kvmmap");
 }
 
@@ -125,7 +172,7 @@ kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 // a physical address. only needed for
 // addresses on the stack.
 // assumes va is page aligned.
-uint64
+/*uint64
 kvmpa(uint64 va)
 {
   uint64 off = va % PGSIZE;
@@ -133,6 +180,23 @@ kvmpa(uint64 va)
   uint64 pa;
   
   pte = walk(kernel_pagetable, va, 0);
+  if(pte == 0)
+    panic("kvmpa");
+  if((*pte & PTE_V) == 0)
+    panic("kvmpa");
+  pa = PTE2PA(*pte);
+  return pa+off;
+}*/
+
+// kvmpa 将内核逻辑地址转换为物理地址（添加第一个参数 kernelpgtbl）
+uint64
+kvmpa(pagetable_t pgtbl, uint64 va)
+{
+  uint64 off = va % PGSIZE;
+  pte_t *pte;
+  uint64 pa;
+
+  pte = walk(pgtbl, va, 0);
   if(pte == 0)
     panic("kvmpa");
   if((*pte & PTE_V) == 0)
