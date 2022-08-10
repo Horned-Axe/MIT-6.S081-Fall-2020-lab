@@ -122,6 +122,7 @@ panic(char *s)
   printf(s);
   printf("\n");
   panicked = 1; // freeze uart output from other CPUs
+  backtrace();
   for(;;)
     ;
 }
@@ -132,3 +133,17 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void)
+{
+  uint64 p=r_fp();//当前帧指针的地址...
+  uint64 up=PGROUNDUP(p);
+  uint64 down=PGROUNDDOWN(p);
+  printf("backtrace:\n");
+  while(p<up&&p>down){//?想当然？多测试、确定为好
+    printf("%p\n",*((uint64*)p-1));//?   //ox?
+    p=*((uint64*)p-2);
+  }  
+}
+
