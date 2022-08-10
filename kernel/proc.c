@@ -113,6 +113,12 @@ found:
     return 0;
   }
 
+  //一并申请一个临时trapframe
+  if((p->alarm_trapframe = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -127,6 +133,8 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->alarm_ticks=0;//初始化alarm_ticks
+
   return p;
 }
 
@@ -139,6 +147,11 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+
+  if(p->alarm_trapframe)//释放
+    kfree((void*)p->alarm_trapframe);
+  p->alarm_trapframe = 0;
+
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
