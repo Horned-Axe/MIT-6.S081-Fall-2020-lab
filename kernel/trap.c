@@ -49,8 +49,8 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
-  if(r_scause() == 8){
+  int r_scause_v=r_scause();
+  if(r_scause_v == 8){
     // system call
 
     if(p->killed)
@@ -67,12 +67,20 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+  } else{//页面错误时
+      uint64 eaddr;
+      if((r_scause_v==13||r_scause_v==15)&&(is_lazy_allocation(eaddr=r_stval()))){//是页错误，且是懒分配
+        if(lazy_allocation(eaddr)<0){
+          printf("lazy allocation fail!\n");
+          p->killed=1;
+        }
+      } 
+      else {
+        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        p->killed = 1;
+      }
   }
-
   if(p->killed)
     exit(-1);
 
