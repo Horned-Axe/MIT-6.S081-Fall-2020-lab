@@ -111,4 +111,6 @@ struct proc {
 
   //uint64 tmp_epc;//保留trapframe中临时现场的属性
   struct trapframe *alarm_trapframe;
+
+  int is_alarm;
 };

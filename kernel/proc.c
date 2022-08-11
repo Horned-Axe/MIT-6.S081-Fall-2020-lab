@@ -135,6 +135,8 @@ found:
 
   p->alarm_ticks=0;//初始化alarm_ticks
 
+  p->is_alarm=0;
+
   return p;
 }
 
@@ -163,6 +165,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->is_alarm=0;//
 }
 
 // Create a user page table for a given process,

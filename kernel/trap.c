@@ -80,11 +80,14 @@ usertrap(void)
   if(which_dev == 2){
     if(p->alarm_ticks>0){
       p->ticks_count++;
-      if(p->ticks_count>p->alarm_ticks){
+      if(p->ticks_count>=p->alarm_ticks){//
         p->ticks_count=0;
+        if(p->is_alarm==0){
         //p->tmp_epc=p->trapframe->epc;
-        *(p->alarm_trapframe)=*(p->alarm_trapframe);
+        p->is_alarm=1;
+        *(p->alarm_trapframe)=*(p->trapframe);
         p->trapframe->epc=p->alarm_handler;
+        }
       }
     }
     yield();
