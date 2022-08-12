@@ -458,7 +458,7 @@ int is_lazy_allocation(uint64 addr)
   if(addr>=(p->sz)){
     return 0;//超出sz...
   }
-  if(addr<PGROUNDDOWN(p->trapframe->sp)&&addr>(PGROUNDUP(p->trapframe->sp)-PGSIZE)){
+  if(addr<PGROUNDDOWN(p->trapframe->sp)&&addr>(PGROUNDDOWN (p->trapframe->sp)-PGSIZE)){
     return 0;
   }
   return 1;
