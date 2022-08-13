@@ -21,13 +21,33 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  char *refPage;//
+  int pageCount;//
+  char* _end;
 } kmem;
+
+int
+pageCount(void *pa_start, void *pa_end)
+{
+  char *p;
+  int count=0;
+  p = (char*)PGROUNDUP((uint64)pa_start);
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+    count++;
+  return count;
+}
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  kmem.pageCount=pageCount(end,(void*)PHYSTOP);//计算页表大小
+  kmem.refPage=end;
+  kmem._end=end+kmem.pageCount;//空出保留字段
+  for(int no=0;no<kmem.pageCount;no++){//置0
+    kmem.refPage[no]=0;
+  }
+  freerange(kmem._end, (void*)PHYSTOP);//好吗...
 }
 
 void
@@ -47,8 +67,13 @@ void
 kfree(void *pa)
 {
   struct run *r;
+  if(kmem.refPage[page_index(pa)]>=1){
+    delRef(pa);
+    if(kmem.refPage[page_index(pa)]!=0)
+      return;
+  }
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < kmem._end || (uint64)pa >= PHYSTOP)//if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
@@ -76,7 +101,36 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
+    addRef((void*)r);//
+  }
   return (void*)r;
+}
+
+int 
+page_index(void* pa){//kmem...是啥...
+  uint64 _pa=(uint64)pa;
+  _pa=PGROUNDDOWN(_pa);
+  int res=(_pa-(uint64)(kmem._end))/PGSIZE;//  int res=(pa-(uint64)end)/PGSIZE;
+  if(res<0||res>kmem.pageCount){
+    panic("page_index illegal");
+  }
+  return res;
+}
+
+void 
+addRef(void* pa){
+  int index=page_index(pa);
+  acquire(&kmem.lock);
+  kmem.refPage[index]++;
+  release(&kmem.lock);
+}
+
+void 
+delRef(void* pa){
+  int index=page_index(pa);
+  acquire(&kmem.lock);
+  kmem.refPage[index]--;
+  release(&kmem.lock);
 }

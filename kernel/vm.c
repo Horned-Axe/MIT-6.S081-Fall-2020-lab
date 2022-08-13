@@ -295,7 +295,7 @@ void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
   if(sz > 0)
-    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
+    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE,1);
   freewalk(pagetable);
 }
 
@@ -311,7 +311,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -319,14 +319,22 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    //清除其写权限
+    *pte=*pte&(~(PTE_W));
+    //flags = PTE_FLAGS(*pte);
+    *pte=*pte|PTE_COW;
     flags = PTE_FLAGS(*pte);
+    /*
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    */
+    //将其映射到父进程的物理页
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){//原：if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
+      //kfree(mem);
       goto err;
     }
+    addRef((void*)pa);
   }
   return 0;
 
@@ -358,6 +366,12 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    if(is_cow_fault(pagetable,va0)){
+      if(copy_on_write(pagetable,va0)<0){
+        printf("copyout:COW failed!\n");
+        return -1;
+      }
+    }
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
@@ -439,4 +453,42 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int is_cow_fault(pagetable_t pagetable,uint64 va){
+  if(va>=MAXVA)
+    return 0;
+  va=PGROUNDDOWN(va);
+  pte_t *pte=walk(pagetable,va,0);//PGROUNDDOWN
+  if(pte == 0)
+    return 0;
+  if((*pte & PTE_V) == 0)
+    return 0;
+  if((*pte & PTE_U) == 0)
+    return 0;
+  if((*pte&PTE_COW)==0)
+    return 0;
+  
+  return 1;
+}
+
+int copy_on_write(pagetable_t pagetable,uint64 va){
+  va=PGROUNDDOWN(va);//!!!没有不好的啊！！！
+  pte_t *pte=walk(pagetable,va,0);
+  uint64 pa=PTE2PA(*pte);//取得地址
+  int flag=PTE_FLAGS(*pte);
+  char* mem=kalloc();
+  if(mem==0){
+    return -1;
+  }
+  memmove(mem, (char*)pa, PGSIZE);//从地址中拷贝
+  uvmunmap(pagetable,va,1,1);//do_free?0吧
+  //*pte=//是否回复COW位...
+  flag=flag&(~PTE_COW);
+  flag=flag|PTE_W;
+  if(mappages(pagetable, va, PGSIZE, (uint64)(mem),flag) != 0){//!=0...
+    kfree(mem);
+    return -1;
+  }
+  return 0;
 }
