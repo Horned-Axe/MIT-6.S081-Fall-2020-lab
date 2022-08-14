@@ -1,0 +1,10 @@
+Why are there missing keys with 2 threads, but not with 1 thread? Identify a sequence of events with 2 threads that can lead to a key being missing. Submit your sequence with a short explanation in answers-thread.txt
+
+Answer：
+因为ph.c中调用pthread_create()函数来创建线程，调用pthread_join()函数来阻塞主线程并等待线程执\
+行结束。每个线程调用`put_thread(void *xa)`，put_thread中，不同的线程负责插入不同的数值，对应\
+的数值通过put()调用insert()插入。
+因此，当两个线程同时访问共有资源struct entry *table[NBUCKET]时，就会发生冲突。举例而言，两个\
+线程可能同时读到一个桶的末尾而后分别执行插入，这样就可能在同一个位置插入而造成覆盖，这就形成了\
+数据丢失。
+
