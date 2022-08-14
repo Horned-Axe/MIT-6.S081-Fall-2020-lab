@@ -143,6 +143,8 @@ void            syscall();
 //sysfile.c
 struct vma*     findVma(struct proc *p, uint64 va);
 int             tryVmaMap(uint64 va);
+void            vmaunmap(pagetable_t pagetable, uint64 va, uint64 nbytes, struct vma *v);
+
 
 // trap.c
 extern uint     ticks;
@@ -175,7 +177,8 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
-void            vmaunmap(pagetable_t pagetable, uint64 va, uint64 nbytes, struct vma *v);
+//void            vmaunmap(pagetable_t pagetable, uint64 va, uint64 nbytes, struct vma *v);//移动了
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 
 
 // plic.c

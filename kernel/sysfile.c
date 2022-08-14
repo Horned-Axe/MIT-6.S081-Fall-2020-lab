@@ -541,12 +541,12 @@ struct vma *findVma(struct proc *p, uint64 va) {
       return vv;
     }
   }
-  return 0;
+  return (struct vma *)0;
 }
 
 int tryVmaMap(uint64 va) {
   struct proc *p = myproc();
-  struct vma *v = findvma(p, va);
+  struct vma *v = findVma(p, va);
   if(v == 0) {
     return 0;
   }
@@ -586,7 +586,7 @@ sys_munmap(void)
 
   struct proc *p = myproc();
   //先确定该vma
-  struct vma *v = findvma(p, addr);
+  struct vma *v = findVma(p, addr);
   if(v == 0) {
     return -1;
   }
@@ -618,4 +618,40 @@ sys_munmap(void)
   }
 
   return 0;  
+}
+
+void
+vmaunmap(pagetable_t pagetable, uint64 va, uint64 nbytes, struct vma *v)
+{
+  uint64 a;
+  pte_t *pte;
+
+  // printf("unmapping %d bytes from %p\n",nbytes, va);
+
+  // borrowed from "uvmunmap"
+  for(a = va; a < va + nbytes; a += PGSIZE){
+    if((pte = walk(pagetable, a, 0)) == 0)
+      panic("sys_munmap: walk");
+    if(PTE_FLAGS(*pte) == PTE_V)
+      panic("sys_munmap: not a leaf");
+    if(*pte & PTE_V){
+      uint64 pa = PTE2PA(*pte);
+      if((*pte & PTE_D) && (v->flags & MAP_SHARED)) { // dirty, need to write back to disk
+        begin_op();
+        ilock(v->f->ip);
+        uint64 aoff = a - v->vastart; // offset relative to the start of memory range
+        if(aoff < 0) { // if the first page is not a full 4k page
+          writei(v->f->ip, 0, pa + (-aoff), v->offset, PGSIZE + aoff);
+        } else if(aoff + PGSIZE > v->sz){  // if the last page is not a full 4k page
+          writei(v->f->ip, 0, pa, v->offset + aoff, v->sz - aoff);
+        } else { // full 4k pages
+          writei(v->f->ip, 0, pa, v->offset + aoff, PGSIZE);
+        }
+        iunlock(v->f->ip);
+        end_op();
+      }
+      kfree((void*)pa);
+      *pte = 0;
+    }
+  }
 }
