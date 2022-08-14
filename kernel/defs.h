@@ -140,6 +140,10 @@ int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
 
+//sysfile.c
+struct vma*     findVma(struct proc *p, uint64 va);
+int             tryVmaMap(uint64 va);
+
 // trap.c
 extern uint     ticks;
 void            trapinit(void);
@@ -171,6 +175,8 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+void            vmaunmap(pagetable_t pagetable, uint64 va, uint64 nbytes, struct vma *v);
+
 
 // plic.c
 void            plicinit(void);
