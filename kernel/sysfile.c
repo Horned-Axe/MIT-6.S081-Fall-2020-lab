@@ -297,6 +297,7 @@ sys_open(void)
 
   begin_op();
 
+  //此步获得inode
   if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
@@ -304,15 +305,36 @@ sys_open(void)
       return -1;
     }
   } else {
-    if((ip = namei(path)) == 0){
-      end_op();
-      return -1;
-    }
-    ilock(ip);
-    if(ip->type == T_DIR && omode != O_RDONLY){
-      iunlockput(ip);
-      end_op();
-      return -1;
+    int link_depth=0;
+
+    while(1){
+      if((ip = namei(path)) == 0){//找不到就润
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+      if(ip->type == T_DIR && omode != O_RDONLY){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      if(ip->type==T_SYMLINK&&!(omode&O_NOFOLLOW)){//是链接文件且不是O_NOFOLLOW则进入
+        if(readi(ip, 0, (uint64)path, 0, MAXPATH) < 0){//进入下一层，循环判断
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        link_depth++;
+        if(link_depth>10){//过深了
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        iunlockput(ip);        
+      }
+      else{
+        break;
+      }
     }
   }
 
@@ -482,5 +504,32 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  //话说回来，既然处理时(对错误)选择返回-1，我们为什么要选择uint呢...?
+  char target[MAXPATH], path[MAXPATH];
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)//获得参数
+    return -1;
+  
+  begin_op();
+  struct inode *ip;
+  ip = create(path, T_SYMLINK, 0, 0);//创建类型为T_SYMLINK的文件
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+
+  if(writei(ip, 0, (uint64)target, 0, MAXPATH) < MAXPATH) {//向ip中写入
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);
+  end_op();
   return 0;
 }
